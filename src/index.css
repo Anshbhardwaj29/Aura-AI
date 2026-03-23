@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  /* Dynamic Semantic Variables */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-page-gradient: var(--page-gradient);
+  
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+
+  /* Aura AI Core Branding (Fixed) */
+  --color-aura-primary: #8b5cf6;
+  --color-aura-secondary: #c084fc;
+  --color-aura-accent: #f472b6;
+}
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #020817;
+    
+    --card: rgba(255, 255, 255, 0.4);
+    --card-foreground: #020817;
+    
+    --primary: #0f172a;
+    --primary-foreground: #f8fafc;
+    
+    --secondary: rgba(241, 245, 249, 0.5);
+    --secondary-foreground: #0f172a;
+    
+    --muted: rgba(241, 245, 249, 0.5);
+    --muted-foreground: #64748b;
+    
+    --accent: rgba(245, 243, 255, 0.6);
+    --accent-foreground: #0f172a;
+    
+    --border: rgba(139, 92, 246, 0.15);
+    --ring: rgba(139, 92, 246, 0.4);
+  }
+
+  .dark {
+    --background: #000000;
+    --foreground: #ffffff;
+    
+    --card: rgba(9, 9, 11, 0.4);
+    --card-foreground: #ffffff;
+    
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    
+    --secondary: rgba(39, 39, 42, 0.4);
+    --secondary-foreground: #ffffff;
+    
+    --muted: rgba(39, 39, 42, 0.4);
+    --muted-foreground: #a1a1aa;
+    
+    --accent: rgba(39, 39, 42, 0.6);
+    --accent-foreground: #ffffff;
+    
+    --border: rgba(255, 255, 255, 0.1);
+    --ring: rgba(139, 92, 246, 0.4);
+  }
+
+  body {
+    background: var(--background);
+    @apply text-foreground antialiased font-sans transition-colors duration-300 selection:bg-aura-primary/30;
+  }
+}
