@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp, Paperclip, SlidersHorizontal, AlertCircle, X, Check, Info } from 'lucide-react';
+import { ArrowUp, Paperclip, SlidersHorizontal, AlertCircle, Check, Calendar, Save, RotateCcw, Bookmark, ChevronDown } from 'lucide-react';
 
 export function InteractiveChatbox({ 
-  placeholders = ["Type a message..."], 
+  placeholders = ["Draft a 15-page IEEE review on Quantum Computing...", "Deep crawl Google Scholar for recent LLaMA models...", "Format my empirical dataset into Springer methodology..."], 
   onSubmit, 
   showLoginTooltip = false,
   className = "" 
@@ -16,45 +16,50 @@ export function InteractiveChatbox({
   const [showTooltip, setShowTooltip] = useState(false);
   const textareaRef = useRef(null);
 
-  // Filter & Info State Management
-  const [showFilters, setShowFilters] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
-  const [filters, setFilters] = useState({
-    yearRange: "any",
+  const defaultFilters = {
+    yearRange: "last2",
     customStart: "",
     customEnd: "",
-    q1Only: false,
+    indexing: [],
     openAccess: false,
-    paperType: "all"
-  });
+    quartiles: [],
+    pubTypes: [],
+    citations: "any",
+    methodologies: [],
+    languages: []
+  };
 
-  // Auto-resize textarea logic
+  const [filters, setFilters] = useState(defaultFilters);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [savedViews, setSavedViews] = useState([]);
+
+  // Auto-resize logic
   const handleInput = (e) => {
     setInputValue(e.target.value);
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; // Reset height bounds
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`; // Adjust up to 200px max
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   };
 
-  // Re-implement the Typewriter effect for placeholders
+  // Typewriter effect
   useEffect(() => {
     if (!placeholders || placeholders.length === 0) return;
-    
     let timeout;
     if (isTyping) {
       if (placeholderText.length < placeholders[currentPlaceholderIndex].length) {
         timeout = setTimeout(() => {
           setPlaceholderText(placeholders[currentPlaceholderIndex].slice(0, placeholderText.length + 1));
-        }, 40); // Natural Typing speed
+        }, 40);
       } else {
-        timeout = setTimeout(() => setIsTyping(false), 2500); // Pause at end before deleting
+        timeout = setTimeout(() => setIsTyping(false), 2500);
       }
     } else {
       if (placeholderText.length > 0) {
         timeout = setTimeout(() => {
           setPlaceholderText(placeholderText.slice(0, -1));
-        }, 20); // Faster deleting speed
+        }, 20);
       } else {
         setCurrentPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
         setIsTyping(true);
@@ -65,17 +70,23 @@ export function InteractiveChatbox({
 
   const handleSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!inputValue.trim()) return;
+    
+    // Prevent completely empty submission
+    if (!inputValue.trim() && Object.values(filters).every(v => v === defaultFilters[Object.keys(filters).find(k => defaultFilters[k] === v)])){
+       return;
+    }
 
     if (showLoginTooltip) {
       setShowTooltip(true);
       setTimeout(() => setShowTooltip(false), 3000);
-    } else if (onSubmit) {
-      onSubmit({ prompt: inputValue, constraints: filters });
-      setInputValue("");
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+    } else {
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        if (onSubmit) {
+          onSubmit({ prompt: inputValue, constraints: filters });
+        }
+      }, 1500);
     }
   };
 
@@ -86,136 +97,63 @@ export function InteractiveChatbox({
     }
   };
 
-  // Calculate active filters badge count
+  const toggleArrayFilter = (key, value) => {
+    setFilters(prev => {
+      const arr = prev[key];
+      if (arr.includes(value)) {
+        return { ...prev, [key]: arr.filter(v => v !== value) };
+      } else {
+        return { ...prev, [key]: [...arr, value] };
+      }
+    });
+  };
+
+  const saveCurrentView = () => {
+    const newView = { name: `Custom Filter View ${savedViews.length + 1}`, filters: { ...filters } };
+    setSavedViews([...savedViews, newView]);
+  };
+
+  const loadSavedView = (view) => {
+    setFilters(view.filters);
+  };
+
+  const clearFilters = () => {
+    setFilters(defaultFilters);
+  };
+
   const activeFiltersCount = 
-    (filters.yearRange !== 'any' ? 1 : 0) + 
-    (filters.q1Only ? 1 : 0) + 
+    (filters.yearRange !== 'last2' ? 1 : 0) + 
+    filters.indexing.length + 
     (filters.openAccess ? 1 : 0) + 
-    (filters.paperType !== 'all' ? 1 : 0);
+    filters.quartiles.length +
+    filters.pubTypes.length +
+    (filters.citations !== 'any' ? 1 : 0) +
+    (filters.methodologies.length > 0 && filters.methodologies[0] !== "" ? 1 : 0) +
+    filters.languages.length;
 
   return (
     <div className={`relative w-full z-50 ${className}`}>
-
-      {/* Advanced Research Constraints Overlay (Compact Filter Card) */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute bottom-[4.5rem] left-0 md:left-4 w-[280px] bg-white/95 dark:bg-background/80 backdrop-blur-2xl border border-black/10 dark:border-white/10 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.15)] z-[100] overflow-hidden text-left flex flex-col"
-          >
-            {/* Popover Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-black/5 dark:border-white/5 bg-black/5 dark:bg-white/5">
-              <span className="font-semibold text-xs flex items-center gap-1.5 text-foreground">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-aura-primary" /> Search Filters
-              </span>
-              <button 
-                type="button" 
-                onClick={() => setShowFilters(false)} 
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Popover Body - Super Compact */}
-            <div className="p-3 flex flex-col gap-3">
-              
-              {/* Publication Year */}
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-1/3">Time</label>
-                <select 
-                  className="w-2/3 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-1.5 text-xs text-foreground outline-none focus:border-aura-primary transition-colors cursor-pointer"
-                  value={filters.yearRange}
-                  onChange={(e) => setFilters({...filters, yearRange: e.target.value})}
-                >
-                  <option value="any">All Time</option>
-                  <option value="1">Last 1 Year</option>
-                  <option value="3">Last 3 Years</option>
-                  <option value="5">Last 5 Years</option>
-                  <option value="custom">Custom...</option>
-                </select>
-              </div>
-
-              {/* Custom Date Row (Only visible if Custom is selected) */}
-              {filters.yearRange === 'custom' && (
-                <div className="flex items-center gap-2 w-full pl-[33%] -mt-1">
-                  <input type="number" placeholder="From" value={filters.customStart} onChange={(e) => setFilters({...filters, customStart: e.target.value})} className="w-1/2 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-1.5 text-xs text-center text-foreground outline-none focus:border-aura-primary" />
-                  <span className="text-muted-foreground text-xs">-</span>
-                  <input type="number" placeholder="To" value={filters.customEnd} onChange={(e) => setFilters({...filters, customEnd: e.target.value})} className="w-1/2 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-1.5 text-xs text-center text-foreground outline-none focus:border-aura-primary" />
-                </div>
-              )}
-
-              {/* Methodology Type */}
-              <div className="flex items-center justify-between gap-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground w-1/3">Type</label>
-                <select 
-                  className="w-2/3 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-1.5 text-xs text-foreground outline-none focus:border-aura-primary transition-colors cursor-pointer"
-                  value={filters.paperType}
-                  onChange={(e) => setFilters({...filters, paperType: e.target.value})}
-                >
-                  <option value="all">Any Type</option>
-                  <option value="systematic">Systematic Review</option>
-                  <option value="empirical">Empirical Study</option>
-                  <option value="clinical">Clinical Trial</option>
-                </select>
-              </div>
-
-              {/* Toggles */}
-              <div className="flex flex-col gap-2 pt-2 border-t border-black/5 dark:border-white/5">
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Scopus Q1 Indexed</span>
-                  <div className={`w-4 h-4 rounded-sm flex items-center justify-center border transition-all duration-300 ${filters.q1Only ? 'bg-aura-primary border-aura-primary shadow-[0_0_10px_rgba(139,92,246,0.3)]' : 'border-black/20 dark:border-white/20'}`}>
-                    {filters.q1Only && <Check className="w-3 h-3 text-white" />}
-                  </div>
-                  <input type="checkbox" className="hidden" checked={filters.q1Only} onChange={(e) => setFilters({...filters, q1Only: e.target.checked})} />
-                </label>
-                
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Open Access PDF</span>
-                  <div className={`w-4 h-4 rounded-sm flex items-center justify-center border transition-all duration-300 ${filters.openAccess ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'border-black/20 dark:border-white/20'}`}>
-                    {filters.openAccess && <Check className="w-3 h-3 text-white" />}
-                  </div>
-                  <input type="checkbox" className="hidden" checked={filters.openAccess} onChange={(e) => setFilters({...filters, openAccess: e.target.checked})} />
-                </label>
-              </div>
-
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Info Tooltip Overlay (Moved OUTSIDE form to completely prevent overflow-hidden clipping errors) */}
-      <AnimatePresence>
-        {showInfo && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className="absolute bottom-[4.5rem] left-10 md:left-24 w-[280px] bg-white/95 dark:bg-background/80 backdrop-blur-2xl border border-black/10 dark:border-white/10 text-foreground p-4 rounded-2xl text-xs leading-relaxed shadow-[0_0_40px_rgba(139,92,246,0.15)] z-[100]"
-          >
-            Choose filters to mathematically tighten your search query constraints, and add attachment documents if you possess existing datasets you'd like indexed.
-            <button 
-              onClick={() => setShowInfo(false)} 
-              className="absolute top-2 right-2 text-muted-foreground hover:text-foreground bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 rounded-full p-1 transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-            {/* Small triangle pointer pointing to Info icon */}
-            <div className="absolute -bottom-2 left-6 md:left-4 w-4 h-4 bg-white/95 dark:bg-background/80 border-b border-r border-black/10 dark:border-white/10 transform rotate-45" />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <form 
         onSubmit={handleSubmit}
-        className={`relative flex flex-col w-full bg-white/95 dark:bg-[#0a0a0f]/80 backdrop-blur-3xl border transition-all duration-300 rounded-[10px] shadow-[0_15px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-2xl overflow-hidden ${
+        className={`relative flex flex-col w-full bg-white/95 dark:bg-[#0a0a0f]/80 backdrop-blur-3xl border transition-all duration-300 rounded-[16px] shadow-[0_15px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-2xl overflow-visible ${
           isFocused ? 'border-aura-primary shadow-[0_0_30px_rgba(139,92,246,0.15)] ring-1 ring-aura-primary/30' : 'border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20'
         }`}
       >
+        {/* Loading Overlay */}
+        <AnimatePresence>
+          {isLoading && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-background/60 backdrop-blur-sm flex flex-col items-center justify-center rounded-[16px]"
+            >
+              <div className="flex items-center gap-3 bg-background/90 p-3 px-5 rounded-full border border-aura-primary/30 shadow-xl">
+                <div className="w-4 h-4 border-2 border-aura-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm font-semibold text-foreground">Updating Research Results...</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <textarea
           ref={textareaRef}
           value={inputValue}
@@ -224,66 +162,239 @@ export function InteractiveChatbox({
           onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
           placeholder={isFocused ? "" : placeholderText}
-          className="w-full bg-transparent border-none outline-none text-foreground placeholder-muted-foreground/70 resize-none px-4 pt-4 pb-2 min-h-[60px] max-h-[200px] text-[15px] leading-relaxed scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10"
+          className="w-full bg-transparent border-none outline-none text-foreground placeholder-muted-foreground/70 resize-none px-5 pt-5 pb-3 min-h-[70px] max-h-[200px] text-[15px] leading-relaxed scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10"
           rows={1}
           style={{ overflowY: inputValue.split('\n').length > 5 ? 'auto' : 'hidden' }}
         />
 
-        {/* Lower Media/Filter Toolbar */}
-        <div className="flex items-center justify-between px-3 pb-3 pt-2">
-          <div className="flex items-center gap-2 relative z-[60]">
-            {/* Attachment Button */}
-            <button type="button" className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group flex items-center gap-1.5 ml-1">
-              <Paperclip className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold hidden sm:inline-block">Attach</span>
-            </button>
-
-            {/* Filter Toggle Button */}
-            <button 
-              type="button" 
-              onClick={() => { setShowFilters(!showFilters); setShowInfo(false); }}
-              className={`p-2 rounded-lg transition-colors cursor-pointer group flex items-center gap-1.5 relative ${showFilters || activeFiltersCount > 0 ? 'text-aura-primary bg-aura-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5'}`}
+        {/* Primary Filters (Always Visible) */}
+        <div className="px-5 py-3 border-t border-black/5 dark:border-white/5 flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-x-6 gap-y-4 bg-black/[0.02] dark:bg-white/[0.02]">
+          
+          {/* Year Range */}
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <select 
+              value={filters.yearRange}
+              onChange={(e) => setFilters({...filters, yearRange: e.target.value})}
+              className="bg-transparent border border-black/10 dark:border-white/10 rounded px-1 py-0.5 text-[11px] font-semibold text-foreground cursor-pointer outline-none hover:border-aura-primary transition-colors focus:border-aura-primary"
             >
-              <SlidersHorizontal className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-semibold hidden sm:inline-block">Constraints</span>
-              
-              {/* Active Filter Notification Badge */}
-              <AnimatePresence>
-                {activeFiltersCount > 0 && (
-                  <motion.span 
-                    initial={{ scale: 0 }} 
-                    animate={{ scale: 1 }} 
-                    exit={{ scale: 0 }}
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-aura-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center"
-                  >
-                    {activeFiltersCount}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </button>
+              <option value="last2">Last 2 Years</option>
+              <option value="last5">Last 5 Years</option>
+              <option value="last10">Last 10 Years</option>
+              <option value="1950">1950 - Current</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </div>
+          
+          {filters.yearRange === 'custom' && (
+            <div className="flex items-center gap-2 -ml-3">
+              <input type="number" placeholder="YYYY" value={filters.customStart} onChange={(e) => setFilters({...filters, customStart: e.target.value})} className="w-14 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded pt-1 pb-1 px-1 text-[11px] text-center text-foreground outline-none focus:border-aura-primary" />
+              <span className="text-muted-foreground text-xs">-</span>
+              <input type="number" placeholder="YYYY" value={filters.customEnd} onChange={(e) => setFilters({...filters, customEnd: e.target.value})} className="w-14 bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded pt-1 pb-1 px-1 text-[11px] text-center text-foreground outline-none focus:border-aura-primary" />
+            </div>
+          )}
 
-            {/* Info Tooltip Icon Trigger (Overlay is rendering externally) */}
-            <button 
-              type="button"
-              onClick={() => { setShowInfo(!showInfo); setShowFilters(false); }}
-              className={`p-2 rounded-lg transition-colors cursor-pointer group flex items-center ${showInfo ? 'text-foreground bg-black/5 dark:bg-white/10' : 'text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5'}`}
-            >
-              <Info className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            </button>
+          {/* Indexing Sources */}
+          <div className="flex items-center gap-3.5 flex-wrap">
+             {["Scopus", "WoS", "PubMed", "IEEE Xplore", "ArXiv"].map(src => (
+               <label key={src} className="flex items-center gap-1.5 cursor-pointer group">
+                  <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${filters.indexing.includes(src) ? 'bg-aura-primary border-aura-primary' : 'border-black/20 dark:border-white/20 group-hover:border-aura-primary/50'}`}>
+                    {filters.indexing.includes(src) && <Check className="w-2.5 h-2.5 text-white" />}
+                  </div>
+                  <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors select-none">{src}</span>
+                  <input type="checkbox" className="hidden" checked={filters.indexing.includes(src)} onChange={() => toggleArrayFilter('indexing', src)} />
+               </label>
+             ))}
           </div>
 
-          <div className="relative">
-            {/* Explicit Login Tooltip Anchor tied specifically to the Arrow Submit Button */}
+          {/* Open Access Toggle */}
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <span className="text-[10px] font-bold tracking-wider text-emerald-500 uppercase select-none cursor-pointer" onClick={() => setFilters({...filters, openAccess: !filters.openAccess})}>Open Access</span>
+            <button 
+              type="button" 
+              onClick={() => setFilters({...filters, openAccess: !filters.openAccess})} 
+              className={`w-7 h-4 rounded-full relative transition-colors ${filters.openAccess ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-black/20 dark:bg-white/20'}`}
+            >
+              <div className={`absolute top-[2px] w-3 h-3 rounded-full bg-white transition-all`} style={{ left: filters.openAccess ? 'calc(100% - 14px)' : '2px' }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Contextual / Advanced Filters */}
+        <AnimatePresence>
+          {showAdvanced && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden bg-[#fafafa] dark:bg-[#12121a]"
+            >
+              <div className="px-5 py-5 border-t border-black/5 dark:border-white/5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8">
+                
+                {/* Journal Quartile */}
+                <div className="flex flex-col gap-3">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Journal Ranking</span>
+                   <div className="flex flex-col gap-2.5 relative z-10">
+                     {["Q1", "Q2", "Q3", "Q4", "Non-Indexed"].map(q => (
+                       <label key={q} className="flex items-center gap-2 cursor-pointer group">
+                          <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-all ${filters.quartiles.includes(q) ? 'bg-aura-primary border-aura-primary' : 'border-black/20 dark:border-white/20'}`}>
+                            {filters.quartiles.includes(q) && <Check className="w-2.5 h-2.5 text-white" />}
+                          </div>
+                          <span className="text-[12px] text-muted-foreground group-hover:text-foreground select-none">{q}</span>
+                          <input type="checkbox" className="hidden" checked={filters.quartiles.includes(q)} onChange={() => toggleArrayFilter('quartiles', q)} />
+                       </label>
+                     ))}
+                   </div>
+                </div>
+
+                {/* Publication Type */}
+                <div className="flex flex-col gap-3">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">Publication Type</span>
+                   <div className="flex flex-col gap-2.5 relative z-10">
+                     {["Journal Article", "Conference Proceeding", "Review Paper", "Case Study", "Theoretical Framework"].map(t => (
+                       <label key={t} className="flex items-center gap-2 cursor-pointer group">
+                          <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center transition-all ${filters.pubTypes.includes(t) ? 'bg-aura-primary border-aura-primary' : 'border-black/20 dark:border-white/20'}`}>
+                            {filters.pubTypes.includes(t) && <Check className="w-2.5 h-2.5 text-white" />}
+                          </div>
+                          <span className="text-[12px] text-muted-foreground group-hover:text-foreground select-none">{t}</span>
+                          <input type="checkbox" className="hidden" checked={filters.pubTypes.includes(t)} onChange={() => toggleArrayFilter('pubTypes', t)} />
+                       </label>
+                     ))}
+                   </div>
+                </div>
+
+                {/* Methodology & Language */}
+                <div className="flex flex-col gap-6">
+                   <div className="flex flex-col gap-2 relative z-10">
+                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Methodology</span>
+                     <select 
+                        value={filters.methodologies[0] || ""}
+                        onChange={(e) => setFilters({...filters, methodologies: [e.target.value]})}
+                        className="w-full bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-2 text-xs text-foreground outline-none cursor-pointer focus:border-aura-primary transition-colors"
+                     >
+                        <option value="">Any Methodology</option>
+                        <option value="Quantitative">Quantitative</option>
+                        <option value="Qualitative">Qualitative</option>
+                        <option value="Mixed Methods">Mixed Methods</option>
+                        <option value="Conceptual">Conceptual</option>
+                     </select>
+                   </div>
+                   
+                   <div className="flex flex-col gap-2">
+                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Language</span>
+                     <div className="flex flex-wrap gap-2 relative z-10">
+                        {["English", "Hindi", "German", "French"].map(l => (
+                          <button
+                            key={l} type="button"
+                            onClick={() => toggleArrayFilter('languages', l)}
+                            className={`px-2.5 py-1 text-[11px] font-medium rounded-full border transition-all ${filters.languages.includes(l) ? 'bg-aura-primary shadow-sm border-aura-primary text-white' : 'bg-transparent border-black/10 dark:border-white/10 text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5'}`}
+                          >
+                            {l}
+                          </button>
+                        ))}
+                     </div>
+                   </div>
+                </div>
+
+                {/* Citation Threshold */}
+                <div className="flex flex-col gap-2 relative z-10">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 mb-1">Citation Threshold</span>
+                   <select 
+                      value={filters.citations}
+                      onChange={(e) => setFilters({...filters, citations: e.target.value})}
+                      className="w-full bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md p-2 text-xs text-foreground outline-none cursor-pointer focus:border-aura-primary transition-colors"
+                   >
+                      <option value="any">Any Threshold</option>
+                      <option value=">10">&gt; 10 Citations</option>
+                      <option value=">50">&gt; 50 Citations</option>
+                      <option value=">100">&gt; 100 Citations</option>
+                   </select>
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Lower Toolbar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-black/5 dark:border-white/5 relative z-20">
+          
+          <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-1 sm:gap-3">
+            <button type="button" className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer group flex items-center gap-1.5">
+              <Paperclip className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold hidden md:inline-block">Attach</span>
+            </button>
+
+            <button 
+              type="button" 
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className={`p-2 rounded-lg transition-colors cursor-pointer group flex items-center gap-1.5 relative ${showAdvanced ? 'text-aura-primary bg-aura-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5'}`}
+            >
+              <SlidersHorizontal className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-semibold">Advanced Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-4 h-4 absolute -top-1.5 -right-1.5 bg-aura-primary text-white text-[9px] font-bold rounded-full flex items-center justify-center pointer-events-none shadow-sm">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            <div className="relative border-l border-black/10 dark:border-white/10 pl-2 sm:pl-3 sm:ml-1 flex items-center gap-2">
+              <button type="button" onClick={saveCurrentView} className="p-2 rounded-lg text-muted-foreground hover:text-aura-primary hover:bg-aura-primary/10 transition-colors cursor-pointer group flex items-center gap-1.5" title="Save Current View">
+                <Bookmark className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              </button>
+              
+              {savedViews.length > 0 && (
+                <div className="relative group/menu">
+                  <button type="button" className="text-[11px] font-semibold flex items-center gap-1 text-aura-primary bg-aura-primary/10 px-2.5 py-1.5 rounded-md cursor-pointer hover:bg-aura-primary/20 transition-colors">
+                    Saved Views <ChevronDown className="w-3 h-3" />
+                  </button>
+                  <div className="absolute bottom-full mb-2 left-0 w-48 bg-white dark:bg-[#1a1a24] border border-black/10 dark:border-white/10 rounded-xl shadow-xl opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200 py-1.5 flex flex-col z-50">
+                    <span className="px-3 py-1 text-[10px] font-bold text-muted-foreground border-b border-black/5 dark:border-white/5 mb-1 uppercase tracking-wider">Your Contexts</span>
+                    {savedViews.map((view, i) => (
+                      <button key={i} type="button" onClick={() => loadSavedView(view)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-aura-primary/10 hover:text-aura-primary transition-colors text-foreground font-medium flex items-center gap-2">
+                        <Bookmark className="w-3 h-3 text-aura-primary opacity-70" /> {view.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex w-full sm:w-auto items-center justify-end gap-2 sm:gap-3">
+             {activeFiltersCount > 0 && (
+               <button 
+                 type="button" 
+                 onClick={clearFilters}
+                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+               >
+                 <RotateCcw className="w-3.5 h-3.5" /> Reset
+               </button>
+             )}
+
+             <button
+                type="button"
+                onClick={handleSubmit} 
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-[8px] text-[11px] font-bold uppercase tracking-wider transition-all duration-300 z-10 relative cursor-pointer ${
+                  activeFiltersCount > 0 
+                  ? 'bg-aura-primary/10 text-aura-primary border border-aura-primary/30 hover:bg-aura-primary hover:text-white' 
+                  : 'bg-black/5 dark:bg-white/5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10'
+                }`}
+             >
+                <Check className="w-3.5 h-3.5" /> Apply Filters
+             </button>
+
             <AnimatePresence>
               {showTooltip && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute bottom-14 right-0 bg-white/95 dark:bg-card/95 backdrop-blur-xl border border-red-500/30 text-red-500 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-end gap-2 whitespace-nowrap shadow-[0_0_30px_rgba(239,68,68,0.2)] z-[100]"
+                  className="absolute bottom-14 right-2 bg-white/95 dark:bg-card/95 backdrop-blur-xl border border-red-500/30 text-red-500 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-end gap-2 whitespace-nowrap shadow-[0_0_30px_rgba(239,68,68,0.2)] z-[100]"
                 >
-                  <AlertCircle className="w-4 h-4 shrink-0" /> Login to see in action
-                  {/* Floating Triangle Pointer directed at the action button */}
+                  <AlertCircle className="w-4 h-4 shrink-0" /> Login to perform search
                   <div className="absolute -bottom-2 right-4 w-4 h-4 bg-white/95 dark:bg-card/95 border-b border-r border-red-500/30 transform rotate-45" />
                 </motion.div>
               )}
@@ -291,9 +402,9 @@ export function InteractiveChatbox({
 
             <button
               type="submit"
-              disabled={!inputValue.trim()}
+              disabled={!inputValue.trim() && activeFiltersCount === 0}
               className={`p-2 rounded-[8px] flex items-center justify-center transition-all duration-300 z-[60] relative ${
-                inputValue.trim() 
+                inputValue.trim() || activeFiltersCount > 0
                   ? 'bg-aura-primary text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] hover:bg-aura-secondary hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] cursor-pointer' 
                   : 'bg-black/5 dark:bg-white/5 text-muted-foreground cursor-not-allowed opacity-50'
               }`}
