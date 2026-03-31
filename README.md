@@ -9,6 +9,65 @@ Furthermore, Aura AI is built to enforce the utmost standard of academic integri
 
 Finally, once the data is analyzed and summarized, Aura AI takes the ultimate leap by autonomously drafting the findings into meticulously formatted LaTeX manuscripts. Compliant with strict publisher guidelines (such as IEEE, Springer, and Nature standards), this platform is not just a standard AI tool—it is an untiring, highly intelligent research assistant built for rigorous, end-to-end academic production.
 
+## 🧩 Autonomous Agent Workflow Diagram
+
+```mermaid
+flowchart TD
+    %% Define Nodes
+    User[👤 User Input: Research Query]
+    Orchestrator{🧠 Research Swarm Orchestrator}
+    
+    %% Agents
+    Scraper[🕵️‍♂️ 1. Scraper Agent]
+    Verifier[✅ 2. Verifier Agent]
+    Summarizer[📝 3. Summarizer Agent]
+    Architect[🏗️ 4. Architect Agent]
+    Drafter[✍️ 5. Drafter Agent]
+    
+    %% Databases & APIs
+    Sources[(Web of Science, PubMed, Scholar)]
+    APIs{{OpenAlex & Scopus APIs}}
+    VectorDB[(High-Dimensional Vector DB)]
+    
+    %% Outputs
+    LaTeX[📜 Automated LaTeX Drafter]
+    Manuscript[📄 Final Formatted Manuscript]
+    Hover[🛡️ Hover Validation Agent]
+
+    %% Connections
+    User --> Orchestrator
+    Orchestrator --> Scraper
+    
+    Scraper -->|Deep Crawl Protocol| Sources
+    Sources -->|Extract Top 50 Papers| Verifier
+    
+    Verifier -->|Cross-Check DOIs| APIs
+    APIs -->|Valid, Peer-Reviewed Data| VectorDB
+    APIs -->|Invalid Source| Discard[❌ Discard]
+    
+    VectorDB -->|Contextual RAG| Summarizer
+    Summarizer -->|Key Insights| Architect
+    Architect -->|Research Structure| Drafter
+    
+    Drafter --> LaTeX
+    LaTeX -->|IEEE / Springer / Nature Framework| Manuscript
+    
+    %% Passive Checks
+    Hover -.->|Real-time Integrity Check| Summarizer
+    Hover -.->|Citation Accuracy Check| Architect
+    Hover -.->|Voice Optimization| Drafter
+
+    %% Styling
+    classDef aiAgent fill:#2a52be,stroke:#fff,stroke-width:2px,color:#fff,rx:5px,ry:5px;
+    classDef database fill:#2b2b2b,stroke:#ffd700,stroke-width:2px,color:#fff;
+    classDef output fill:#2e8b57,stroke:#fff,stroke-width:2px,color:#fff;
+    
+    class Scraper,Verifier,Summarizer,Architect,Drafter aiAgent;
+    class Sources,VectorDB database;
+    class Manuscript output;
+```
+
+
 ## 🚀 Key Features
 - **Intelligent Research Swarm**: Orchestrates 5 specialized asynchronous agents (Scraper, Verifier, Summarizer, Architect, and Drafter) to handle complex academic workflows.
 - **Deep Crawl Protocol**: Real-time extraction from Google Scholar, Web of Science, and PubMed (targeting top 50 relevant papers).
